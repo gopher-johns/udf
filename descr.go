@@ -290,7 +290,9 @@ func (fid *FileIdentifierDescriptor) FromBytes(b []byte) *FileIdentifierDescript
 	fid.LengthOfFileIdentifier = r_u8(b[19:])
 	fid.ICB = NewExtentLong(b[20:])
 	fid.LengthOfImplementationUse = rl_u16(b[36:])
-	fid.ImplementationUse = NewEntityID(b[38:])
+	if fid.LengthOfImplementationUse > 0 {
+		fid.ImplementationUse = NewEntityID(b[38:])
+	}
 	identStart := 38 + fid.LengthOfImplementationUse
 	fid.FileIdentifier = r_dcharacters(b[identStart : fid.LengthOfFileIdentifier+uint8(identStart)])
 	return fid

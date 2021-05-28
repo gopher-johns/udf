@@ -1,6 +1,7 @@
 package udf
 
 import (
+	"fmt"
 	"io"
 	"os"
 	"time"
@@ -17,8 +18,11 @@ func (f *File) GetFileEntryPosition() int64 {
 	return int64(f.fileEntryPosition)
 }
 
-func (f *File) GetFileOffset() int64 {
-	return SECTOR_SIZE * (int64(f.FileEntry().AllocationDescriptors[0].Location) + int64(f.Udf.PartitionStart()))
+func (f *File) GetFileOffset() (int64, error) {
+	if len(f.FileEntry().AllocationDescriptors) == 0 {
+		return 0, fmt.Errorf("empty descriptors")
+	}
+	return SECTOR_SIZE * (int64(f.FileEntry().AllocationDescriptors[0].Location) + int64(f.Udf.PartitionStart())), nil
 }
 
 func (f *File) FileEntry() *FileEntry {
@@ -29,8 +33,14 @@ func (f *File) FileEntry() *FileEntry {
 	return f.fe
 }
 
-func (f *File) NewReader() *io.SectionReader {
-	return io.NewSectionReader(f.Udf.r, f.GetFileOffset(), f.Size())
+func (f *File) NewReader() (sr *io.SectionReader, err error) {
+
+	offset, err := f.GetFileOffset()
+	if err != nil {
+		return
+	}
+	return io.NewSectionReader(f.Udf.r, offset, f.Size()), nil
+
 }
 
 func (f *File) Name() string {
@@ -69,6 +79,6 @@ func (f *File) Sys() interface{} {
 	return f.Fid
 }
 
-func (f *File) ReadDir() []File {
+func (f *File) ReadDir() ([]File, error) {
 	return f.Udf.ReadDir(f.FileEntry())
 }

@@ -1,6 +1,7 @@
 package udf
 
 import (
+	"fmt"
 	"io"
 )
 
@@ -44,14 +45,15 @@ func (udf *Udf) ReadSector(sectorNumber uint64) []byte {
 	return udf.ReadSectors(sectorNumber, 1)
 }
 
-func (udf *Udf) init() {
+func (udf *Udf) init() (err error) {
 	if udf.isInited {
 		return
 	}
 
 	anchorDesc := NewAnchorVolumeDescriptorPointer(udf.ReadSector(256))
 	if anchorDesc.Descriptor.TagIdentifier != DESCRIPTOR_ANCHOR_VOLUME_POINTER {
-		panic(anchorDesc.Descriptor.TagIdentifier)
+		err = fmt.Errorf("invalid tag identifier: %x", anchorDesc.Descriptor.TagIdentifier)
+		return
 	}
 
 	for sector := uint64(anchorDesc.MainVolumeDescriptorSeq.Location); ; sector++ {
@@ -75,10 +77,15 @@ func (udf *Udf) init() {
 	udf.root_fe = NewFileEntry(udf.ReadSector(partitionStart + udf.fsd.RootDirectoryICB.Location))
 
 	udf.isInited = true
+
+	return nil
 }
 
-func (udf *Udf) ReadDir(fe *FileEntry) []File {
-	udf.init()
+func (udf *Udf) ReadDir(fe *FileEntry) ([]File, error) {
+	err := udf.init()
+	if err != nil {
+		return []File{}, err
+	}
 
 	if fe == nil {
 		fe = udf.root_fe
@@ -105,7 +112,7 @@ func (udf *Udf) ReadDir(fe *FileEntry) []File {
 		fdOff += fid.Len()
 	}
 
-	return result
+	return result, nil
 }
 
 func NewUdfFromReader(r io.ReaderAt) *Udf {
